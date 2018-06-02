@@ -1,0 +1,43 @@
+{
+	"name": "Add3UInts",
+	"package": "test",
+	"channels": [
+		{ "id": 0, "type": "uint" },
+		{ "id": 1, "type": "uint" },
+		{ "id": 2, "type": "uint" },
+		{ "id": 3, "type": "uint" },
+		{ "id": 4, "type": "uint" }
+	],
+	"inputs": [
+		{ "name": "x", "type": "uint", "channel": 0 },
+		{ "name": "y", "type": "uint", "channel": 1 },
+		{ "name": "z", "type": "uint", "channel": 3 }
+	],
+	"outputs": [
+		{ "name": "sum", "type": "uint", "channel": 4 }
+	],
+	"chips": [
+		{
+			"name": "Add2UInt",
+			"package": "builtin",
+			"inputs": [
+				{ "name": "a", "type": "uint", "channel": 0 },
+				{ "name": "b", "type": "uint", "channel": 1 }
+			],
+			"outputs": [
+				{ "name": "c", "type": "uint", "channel": 2 }
+			]
+		},
+		{
+			"name": "Add2UInt",
+			"package": "builtin",
+			"inputs": [
+				{ "name": "a", "type": "uint", "channel": 2 },
+				{ "name": "b", "type": "uint", "channel": 3 }
+			],
+			"outputs": [
+				{ "name": "c", "type": "uint", "channel": 4 }
+			]
+		}
+	]
+}

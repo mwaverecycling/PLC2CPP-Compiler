@@ -1,5 +1,5 @@
 {
-	"name": "add_ints",
+	"name": "AddUInts",
 	"package": "test",
 	"channels": [
 		{ "id": 0, "type": "uint" },
@@ -7,58 +7,22 @@
 		{ "id": 2, "type": "uint" }
 	],
 	"inputs": [
-		{
-			"name": "x",
-			"channel": {
-				"id": 0,
-				"type": "uint"
-			}
-		},
-		{
-			"name": "y",
-			"channel": {
-				"id": 1,
-				"type": "uint"
-			}
-		}
+		{ "name": "x", "type": "uint", "channel": 0 },
+		{ "name": "y", "type": "uint", "channel": 1 }
 	],
 	"outputs": [
-		{
-			"name": "sum",
-			"channel": {
-				"id": 2,
-				"type": "uint"
-			}
-		}
+		{ "name": "sum", "type": "uint", "channel": 2 }
 	],
 	"chips": [
 		{
-			"name": "add_2_uint",
+			"name": "Add2UInt",
 			"package": "builtin",
 			"inputs": [
-				{
-					"name": "a",
-					"channel": {
-						"id": 0,
-						"type": "uint"
-					}
-				},
-				{
-					"name": "b",
-					"channel": {
-						"id": 1,
-						"type": "uint"
-					}
-				}
+				{ "name": "a", "type": "uint", "channel": 0 },
+				{ "name": "b", "type": "uint", "channel": 1 }
 			],
 			"outputs": [
-				{
-					"name": "c",
-					"channel": {
-						"id": 2,
-						"type": "uint"
-					}
-				}
+				{ "name": "c", "type": "uint", "channel": 2 }
 			]
 		}
 	]

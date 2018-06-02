@@ -1,13 +1,62 @@
-import { readFileSync, ensureDir, ensureDirSync, ensureFile, createWriteStream } from "fs-extra";
+import { readFileSync, ensureDir, ensureDirSync, ensureFile, createWriteStream, readFile, writeFile } from "fs-extra";
 import { join as joinPath, sep as pathSep } from "path";
 
-import { PLCCircuit, PLCType } from "./PLC";
+import { PLCCircuit } from "./PLC";
 
 
-
-export class PLCCompiler
+export type template_option = { [key: string]: string }
+export async function templateFile(infile: string, options?: template_option): Promise<string>;
+export async function templateFile(infile: string, outfile: string, options?: template_option): Promise<void>;
+export async function templateFile(infile: string, outfile?: string | template_option, options: template_option = {  }): Promise<string | void>
 {
-	private outdir: string;
+	if(outfile && typeof(outfile) !== "string") { options = outfile; }
+	return readFile(infile, "utf8")
+		.then<string | void>((data) => {
+			for(let key in options)
+			{
+				data = data.replace(new RegExp(`%${key}%`, "g"), options[key]);
+			}
+
+			return (outfile && typeof(outfile) === "string") ? writeFile(outfile, data, "utf8") : data;
+		});
+}
+
+export type PLCCompilerMessage = { status: string; message: string; };
+function compilerError(msg: string): PLCCompilerMessage { return { status: "error", message: msg }; }
+export function checkCircuit(circuit: PLCCircuit): PLCCompilerMessage
+{
+	let errmsgs: string[] = [  ];
+	// Friendly name errors
+	if(!/^[a-zA-Z]/.test(circuit.name)) { errmsgs.push("Circuit name must start with a letter"); }
+	else if(!/^[a-zA-Z][a-zA-Z0-9_]+$/g.test(circuit.name)) { errmsgs.push("Circuit name can only contain alphanumeric characters and underscores"); }
+
+	// Friendly package errors
+	if(circuit.package.charAt(0) === "/" || circuit.package.charAt(circuit.package.length - 1) === "/") { errmsgs.push("Circuit package cannot start or end with a path separator"); }
+	else if(!/^([a-zA-Z0-9_]+)(\/[a-zA-Z0-9_]+)*$/.test(circuit.package)) { errmsgs.push("Circuit package must be a valid path using alphanumerics and/or underscores"); }
+
+	const channelTypes = circuit.channels.map((channel) => channel.type);
+	circuit.inputs.forEach((input) => {
+		if(input.type !== channelTypes[input.channel]) { errmsgs.push(`Type of input '${input.name}' does not match attached channel's type [${input.type} != ${channelTypes[input.channel]}]`); }
+	});
+	circuit.outputs.forEach((output) => {
+		if(output.type !== channelTypes[output.channel]) { errmsgs.push(`Type of output '${output.name}' does not match attached channel's type [${output.type} != ${channelTypes[output.channel]}]`); }
+	});
+	circuit.chips.forEach((chip) => {
+		chip.inputs.forEach((input) => {
+			if(input.type !== channelTypes[input.channel]) { errmsgs.push(`Type of ${chip.name}'s input '${input.name}' does not match attached channel's type [${input.type} != ${channelTypes[input.channel]}]`); }
+		});
+		chip.outputs.forEach((output) => {
+			if(output.type !== channelTypes[output.channel]) { errmsgs.push(`Type of ${chip.name}'s output '${output.name}' does not match attached channel's type [${output.type} != ${channelTypes[output.channel]}]`); }
+		});
+	});
+
+	return errmsgs.length > 0 ? compilerError(errmsgs.join('\n')) : { status: "success", message: "Circuit is valid!" };
+}
+
+
+export abstract class PLCCompiler
+{
+	protected outdir: string;
 
 	public constructor()
 	{
@@ -18,77 +67,9 @@ export class PLCCompiler
 	public async compileFromJSON(filename: string): Promise<void>
 	{
 		const obj = JSON.parse(readFileSync(filename, "utf8")) as PLCCircuit;
-		return this.compileToC(obj);
+		return this.compile(obj);
 	}
+	protected abstract async compile(obj: PLCCircuit): Promise<void>;
 
-	private async compileToC(circuit: PLCCircuit): Promise<void>
-	{
-		const builddir = joinPath(this.outdir, this.package_path(circuit.package));
-		const headerfile = joinPath(builddir, `${circuit.name}.h`);
-		const sourcefile = joinPath(builddir, `${circuit.name}.c`);
-		ensureDir(builddir)
-			.then(() => Promise.all([
-				ensureFile(headerfile).then(() => this.compileToC_Header(circuit, headerfile)),
-				ensureFile(sourcefile).then(() => this.compileToC_Source(circuit, sourcefile))
-			])).then(() => {  });
-	}
-	private async compileToC_Header(circuit: PLCCircuit, filename: string): Promise<void>
-	{
-		const outinc = createWriteStream(filename);
-
-
-		var outchunk = `#ifndef _H__PLC_${circuit.name.toUpperCase()}\n#define _H__PLC_${circuit.name.toUpperCase()}\n\n`;
-		outinc.write(outchunk, "utf8");
-
-		outchunk = `struct s_plc_${circuit.name}_input {\n`;
-		circuit.inputs.forEach((input) => {
-			outchunk += `\t${this.map_type(input.channel.type)} ${input.name};\n`;
-		});
-		outchunk += "}\n";
-		outinc.write(outchunk, "utf8");
-
-		outchunk = `struct s_plc_${circuit.name}_output {\n`;
-		circuit.outputs.forEach((output) => {
-			outchunk += `\t${this.map_type(output.channel.type)} ${output.name};\n`;
-		});
-		outchunk += "}\n";
-		outinc.write(outchunk, "utf8");
-
-		outchunk = `struct s_plc_${circuit.name}_output * f_plc_${circuit.name}(struct s_plc_${circuit.name}_input * input);\n\n`;
-		outchunk += "#endif";
-		return new Promise<void>((resolve, reject) => {
-			outinc.end(outchunk, "utf8", () => resolve());
-		});
-	}
-	private async compileToC_Source(circuit: PLCCircuit, filename: string): Promise<void>
-	{
-		const outsrc = createWriteStream(filename);
-
-		var outchunk = `#include "${this.package_path(circuit.package)}/${circuit.name}.h"\n\n`;
-		const includes = circuit.chips
-			.map((chip) => `${this.package_path(chip.package)}/${chip.name}.h`)
-			.filter((include, index, arr) => arr.indexOf(include) == index);
-		includes.forEach((include) => { outchunk += `#include "${include}"\n` });
-
-		return new Promise<void>((resolve, reject) => {
-			outsrc.end(outchunk, () => resolve());
-		});
-	}
-
-
-
-	private package_path(pak: string): string { return pak.replace(/\./g, pathSep); }
-	private map_type(plcType: PLCType): string 
-	{
-		switch (plcType) {
-			case "bool": case "bit": case "byte":
-				return "unsigned char"
-			case "int":
-				return "long";
-			case "uint":
-				return "unsigned long";
-			case "float":
-				return "double";
-		}
-	}
+	protected package_path(pak: string): string { return pak.replace(/\./g, pathSep); }
 }

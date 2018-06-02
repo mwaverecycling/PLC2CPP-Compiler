@@ -1,4 +1,6 @@
 
+export type PLCDataType = "bool" | "bit" | "byte" | "int" | "uint" | "long" | "ulong" | "float" | "double";
+export type PLCChannelID = number;
 
 export interface PLCChip
 {
@@ -14,14 +16,13 @@ export interface PLCCircuit extends PLCChip
 }
 export interface PLCChannel
 {
-	id: number;
-	type: PLCType;
+	id: PLCChannelID;
+	type: PLCDataType;
 }
-
-export type PLCType = "bool" | "bit" | "byte" | "int" | "uint" | "float";
 
 export interface PLCInterface
 {
 	name: string;
-	channel: PLCChannel;
+	type: PLCDataType;
+	channel: PLCChannelID;
 }

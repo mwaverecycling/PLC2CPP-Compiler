@@ -1,6 +1,6 @@
 import { existsSync } from "fs";
 
-import { PLCCompiler } from "./compiler";
+import { PLC2CPPMainCompiler } from "./compilers/PLC2CPPMainCompiler";
 
 
 
@@ -11,8 +11,15 @@ class Main
 	{
 		const filename = args[0];
 		if(filename && existsSync(filename)) {
-			const compiler = new PLCCompiler();
-			compiler.compileFromJSON(filename);
+			const compiler = new PLC2CPPMainCompiler();
+			compiler.compileFromJSON(filename)
+				.then(() => {
+					console.log("Compilation Finished!");
+				})
+				.catch((err) => {
+					console.error("Erro during compilation!");
+					console.error(err);
+				});
 		}
 	}
 
