@@ -67,6 +67,8 @@ export abstract class PLCCompiler
 	public async compileFromJSON(filename: string): Promise<void>
 	{
 		const obj = JSON.parse(readFileSync(filename, "utf8")) as PLCCircuit;
+		const res = checkCircuit(obj);
+		if(res.status === "error") { throw res.message; }
 		return this.compile(obj);
 	}
 	protected abstract async compile(obj: PLCCircuit): Promise<void>;
